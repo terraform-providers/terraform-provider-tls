@@ -1,12 +1,15 @@
 package tls
 
 import (
+	"crypto/rand"
 	"crypto/x509"
+	"encoding/base64"
 	"encoding/pem"
 	"fmt"
 
 	"github.com/hashicorp/terraform-plugin-sdk/helper/schema"
 	"golang.org/x/crypto/ssh"
+	"software.sslmate.com/src/go-pkcs12"
 )
 
 func decodePEM(d *schema.ResourceData, pemKey, pemType string) (*pem.Block, error) {
@@ -102,4 +105,16 @@ func readPublicKey(d *schema.ResourceData, rsaKey interface{}) error {
 		d.Set("public_key_fingerprint_md5", "")
 	}
 	return nil
+}
+
+func toPkcs12(privateKey interface{}, cert *x509.Certificate, caCerts []*x509.Certificate, password string) ([]byte, error) {
+
+	pkcs12Data, err := pkcs12.Encode(rand.Reader, privateKey, cert, caCerts, password)
+	if err != nil {
+		return nil, err
+	}
+
+	buf := make([]byte, base64.StdEncoding.EncodedLen(len(pkcs12Data)))
+	base64.StdEncoding.Encode(buf, pkcs12Data)
+	return buf, nil
 }

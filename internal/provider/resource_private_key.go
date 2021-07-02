@@ -44,6 +44,9 @@ var keyParsers map[string]keyParser = map[string]keyParser{
 	"ECDSA": func(der []byte) (interface{}, error) {
 		return x509.ParseECPrivateKey(der)
 	},
+	"PKCS#8": func(der []byte) (interface{}, error) {
+		return x509.ParsePKCS8PrivateKey(der)
+	},
 }
 
 func resourcePrivateKey() *schema.Resource {
@@ -77,6 +80,12 @@ func resourcePrivateKey() *schema.Resource {
 			},
 
 			"private_key_pem": {
+				Type:      schema.TypeString,
+				Computed:  true,
+				Sensitive: true,
+			},
+
+			"private_key_pkcs8_pem": {
 				Type:      schema.TypeString,
 				Computed:  true,
 				Sensitive: true,
@@ -132,9 +141,22 @@ func CreatePrivateKey(d *schema.ResourceData, meta interface{}) error {
 	default:
 		return fmt.Errorf("unsupported private key type")
 	}
-	keyPem := string(pem.EncodeToMemory(keyPemBlock))
 
-	d.Set("private_key_pem", keyPem)
+	pkcs8KeyBytes, err := x509.MarshalPKCS8PrivateKey(key)
+	if err != nil {
+		return fmt.Errorf("error encoding key to PEM: %s", err)
+	}
+
+	keypkcs8PemBlock := &pem.Block{
+		Type:  "PRIVATE KEY",
+		Bytes: pkcs8KeyBytes,
+	}
+
+	pkcs1Pem := string(pem.EncodeToMemory(keyPemBlock))
+	d.Set("private_key_pem", pkcs1Pem)
+
+	pkcs8Pem := string(pem.EncodeToMemory(keypkcs8PemBlock))
+	d.Set("private_key_pkcs8_pem", pkcs8Pem)
 
 	return readPublicKey(d, key)
 }
